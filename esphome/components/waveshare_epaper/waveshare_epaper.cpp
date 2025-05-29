@@ -4996,6 +4996,8 @@ void EPaper2P9InBWR::update_full_() {
     this->data(this->buffer_[i]);
   }
 
+  delay(100);
+
   // ===== COMMAND 0x26: Write RAM (Red) =====
   // Spec: Writes data to the Red color RAM area
   // Each bit controls red pixel overlay: 0=no red, 1=red
