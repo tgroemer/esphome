@@ -4997,7 +4997,7 @@ void EPaper2P9InBWR::update_full_() {
     this->data(this->buffer_[i]);
 
     if (i % 1000 == 0) {
-      delay(10)
+      delay(10);
     }
   }
 
@@ -5013,7 +5013,7 @@ void EPaper2P9InBWR::update_full_() {
     this->data(~this->buffer_[i]);  // Invert red data
 
     if (i % 1000 == 0) {
-      delay(10)
+      delay(10);
     }
   }
 
