@@ -4831,11 +4831,11 @@ void EPaper2P9InBWR::reset_() {
   // Reset timing is critical for proper initialization
   if (this->reset_pin_ != nullptr) {
     this->reset_pin_->digital_write(true);   // Ensure not in reset initially
-    delay(200);
+    delay(10);
     this->reset_pin_->digital_write(false);  // Assert reset (active LOW)
     delay(10);                               // Hold reset for minimum time
     this->reset_pin_->digital_write(true);   // Release reset
-    delay(200);                               // Wait for internal initialization
+    delay(10);                               // Wait for internal initialization
   }
 }
 
