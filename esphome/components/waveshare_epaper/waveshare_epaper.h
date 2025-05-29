@@ -1112,7 +1112,7 @@ class EPaper2P9InBWR : public WaveshareEPaperBWR {
   int get_height_internal() override { return 296; }
   uint32_t idle_timeout_() override { return 15000; }
 
-  void reset_() override;
+  void reset_();
   void init_display_();
   void update_full_();
   void update_partial_();
