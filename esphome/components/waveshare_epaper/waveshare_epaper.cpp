@@ -5006,10 +5006,14 @@ void EPaper2P9InBWR::update_full_() {
   // Red pixels override the BW data at the same coordinates
   this->set_memory_pointer_(0, 0);
   this->command(0x26);
-  for (uint32_t i = buf_half_len; i < buf_len; i++) {
-    ESP_LOGD(TAG, "Updating byte red %d", i);
-    this->data(~this->buffer_[i]);  // Invert red data
-  }
+  this->start_data_();
+  this->write_array(this->buffer_, buf_len);
+  this->end_data_();
+
+  //for (uint32_t i = buf_half_len; i < buf_len; i++) {
+  //  ESP_LOGD(TAG, "Updating byte red %d", i);
+  //  this->data(~this->buffer_[i]);  // Invert red data
+  //}
 
   // ===== COMMAND 0x22: Display Update Control 2 =====
   this->command(0x22);
