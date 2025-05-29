@@ -4992,11 +4992,13 @@ void EPaper2P9InBWR::update_full_() {
   this->set_memory_pointer_(0, 0);
   this->command(0x24);
   this->start_data_();
-  for (uint32_t i = 0; i < buf_half_len; i++) {
-    ESP_LOGD(TAG, "Updating byte bw %d", i);
-    this->data(this->buffer_[i]);
-  }
+  this->write_array(this->buffer_, buf_half_len);
   this->end_data_();
+
+//  for (uint32_t i = 0; i < buf_half_len; i++) {
+//    ESP_LOGD(TAG, "Updating byte bw %d", i);
+//    this->data(this->buffer_[i]);
+//  }
 
   // ===== COMMAND 0x26: Write RAM (Red) =====
   // Spec: Writes data to the Red color RAM area
@@ -5004,12 +5006,10 @@ void EPaper2P9InBWR::update_full_() {
   // Red pixels override the BW data at the same coordinates
   this->set_memory_pointer_(0, 0);
   this->command(0x26);
-  this->start_data_();
   for (uint32_t i = buf_half_len; i < buf_len; i++) {
     ESP_LOGD(TAG, "Updating byte red %d", i);
     this->data(~this->buffer_[i]);  // Invert red data
   }
-  this->end_data_();
 
   // ===== COMMAND 0x22: Display Update Control 2 =====
   this->command(0x22);
