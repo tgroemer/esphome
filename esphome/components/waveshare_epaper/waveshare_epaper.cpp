@@ -4750,5 +4750,382 @@ void WaveshareEPaper13P3InK::dump_config() {
   LOG_UPDATE_INTERVAL(this);
 }
 
+void EPaper2P9InBWR::initialize() {
+  ESP_LOGD(TAG, "Initializing EPaper 2.9\" BWR display...");
+
+  // Allocate & clear old_buffer_ (half = BW, half = Red)
+  const uint32_t buf_len = this->get_buffer_length_();
+  const uint32_t half_len = buf_len / 2;
+  if (this->old_buffer_) {
+    delete[] this->old_buffer_;
+    this->old_buffer_ = nullptr;
+  }
+  this->old_buffer_ = new uint8_t[buf_len];
+  // BW plane = white (0xFF), Red plane = no-red (0x00)
+  memset(this->old_buffer_,       0xFF,    half_len);
+  memset(this->old_buffer_ + half_len, 0x00, half_len);
+
+  this->init_display_();
+}
+
+void EPaper2P9InBWR::init_display_() {
+  ESP_LOGD(TAG, "Running init display...");
+
+  this->reset_();
+
+  delay(10);
+  this->wait_until_idle_();
+
+  // ===== COMMAND 0x12: Software Reset (SWRESET) =====
+  // Spec: Resets the commands and parameters to their S/W Reset default values
+  // This ensures a clean state regardless of previous operations
+  this->command(0x12);
+  delay(10);
+  this->wait_until_idle_();
+
+  // ===== COMMAND 0x01: Driver Output Control =====
+  // Spec Section 8.1: Controls gate driver scanning sequence and direction
+  // Data 1: MUX[7:0] - Number of gate lines (296 lines = 0x127, low byte = 0x27)
+  // Data 2: MUX[8] + Gate scan direction + Gate voltage level
+  // Data 3: First gate line selection (0x00 = G0 first)
+  this->command(0x01);
+  this->data((this->get_height_internal() - 1) % 256);  // MUX low byte: 296-1 = 295 = 0x127, low = 0x27
+  this->data((this->get_height_internal() - 1) / 256);  // MUX high bit
+  this->data(0x00);  // First output gate: G0
+
+  // ===== COMMAND 0x11: Data Entry Mode Setting =====
+  // Spec Section 8.3: Defines data entry sequence and direction
+  // Bit 2-1: ID[1:0] - Address increment direction
+  // Bit 0: AM - Address mode (0=X increment, 1=Y increment)
+  // 0x03 = X increment, Y increment, normal direction
+  this->command(0x11);
+  this->data(0x03);  // X increment, Y increment mode
+
+  // ===== COMMAND 0x3C: Border Waveform Control =====
+  // Spec: Controls the border area waveform during display update
+  // 0x05 = Follow LUT with specific border behavior
+  this->command(0x3C);
+  this->data(0x05);  // Border follows LUT, prevents border artifacts
+
+  // ===== COMMAND 0x18: Temperature Sensor Control =====
+  // Spec: Enables/disables built-in temperature sensor for waveform optimization
+  // 0x80 = Use built-in temperature sensor (automatic temperature compensation)
+  this->command(0x18);
+  this->data(0x80);  // Enable built-in temperature sensor
+
+  // ===== COMMAND 0x21: Display Update Control 1 =====
+  // Spec: Controls display update options and bypass settings
+  // Data 1: Bypass options (0x00 = normal operation)
+  // Data 2: Update options (0x80 = enable bypass, use for initialization)
+  this->command(0x21);
+  this->data(0x00);  // Normal RAM bypass option
+  this->data(0x80);  // Enable bypass during initialization
+
+  // Set initial memory area to full screen
+  this->set_memory_area_(0, 0, this->get_width_internal(), this->get_height_internal());
+  this->set_memory_pointer_(0, 0);
+}
+
+void EPaper2P9InBWR::reset_() {
+  // Hardware reset sequence per SSD1680 specification
+  // Reset timing is critical for proper initialization
+  if (this->reset_pin_ != nullptr) {
+    this->reset_pin_->digital_write(true);   // Ensure not in reset initially
+    delay(200);
+    this->reset_pin_->digital_write(false);  // Assert reset (active LOW)
+    delay(10);                               // Hold reset for minimum time
+    this->reset_pin_->digital_write(true);   // Release reset
+    delay(200);                               // Wait for internal initialization
+  }
+}
+
+void EPaper2P9InBWR::set_memory_area_(uint16_t x, uint16_t y, uint16_t w, uint16_t h) {
+  // Validate coordinates
+  if (x >= this->get_width_internal()) {
+    ESP_LOGE(TAG, "Invalid X coordinate");
+    return;
+  }
+  if (y >= this->get_height_internal()) {
+    ESP_LOGE(TAG, "Invalid Y coordinate");
+    return;
+  }
+
+  // ===== COMMAND 0x44: Set RAM X Address Start/End Position =====
+  // Spec: Defines horizontal window for RAM operations (byte addresses)
+  // Start and end addresses are in 8-pixel units (bytes)
+  this->command(0x44);
+  this->data(x / 8);               // X start address in bytes
+  this->data((x + w - 1) / 8);     // X end address in bytes
+
+  // ===== COMMAND 0x45: Set RAM Y Address Start/End Position =====
+  // Spec: Defines vertical window for RAM operations (pixel addresses)
+  // Y addresses are in individual pixel units, sent as 16-bit values
+  this->command(0x45);
+  this->data(y % 256);             // Y start low byte
+  this->data(y / 256);             // Y start high byte
+  this->data((y + h - 1) % 256);   // Y end low byte
+  this->data((y + h - 1) / 256);   // Y end high byte
+}
+
+void EPaper2P9InBWR::set_memory_pointer_(uint16_t x, uint16_t y) {
+  // ===== COMMAND 0x4E: Set RAM X Address Counter =====
+  // Sets the current X position for RAM write operations
+  this->command(0x4E);
+  this->data(x / 8);  // X address in 8-pixel units (bytes)
+
+  // ===== COMMAND 0x4F: Set RAM Y Address Counter =====
+  // Sets the current Y position for RAM write operations
+  this->command(0x4F);
+  this->data(y % 256);      // Y address low byte
+  this->data(y / 256);      // Y address high byte
+}
+
+bool EPaper2P9InBWR::has_significant_changes_() {
+  if (this->first_update_ || this->old_buffer_ == nullptr) {
+    ESP_LOGD(TAG, "Detected changes: first update");
+    return true;  // Always update on first run or if no previous buffer
+  }
+
+  const uint32_t buffer_size = this->get_buffer_length_();
+  uint32_t changes = 0;
+
+  // Count changed bytes to decide between partial vs full update
+  // Large numbers of changes benefit from full refresh for better quality
+  for (uint32_t i = 0; i < buffer_size; i++) {
+    if (this->buffer_[i] != this->old_buffer_[i]) {
+      changes++;
+      // TODO
+      // if (changes > buffer_size / 10) {  // >10% changed = prefer full update
+      //   return true;
+      // }
+    }
+  }
+
+  ESP_LOGD(TAG, "Detected changes: %d out of %d bytes", changes, buffer_size);
+  return changes > 0;
+}
+
+void EPaper2P9InBWR::find_dirty_region_(uint16_t &x_start, uint16_t &y_start, uint16_t &x_end, uint16_t &y_end) {
+  const uint16_t width = this->get_width_internal();
+  const uint16_t height = this->get_height_internal();
+  const uint32_t buf_half_len = this->get_buffer_length_() / 2u;
+
+  // Initialize to invalid region for bounds detection
+  x_start = width;
+  y_start = height;
+  x_end = 0;
+  y_end = 0;
+
+  bool found_change = false;
+
+  // Scan both BW and Red buffers for changes
+  // BWR displays use two separate RAM areas in SSD1680
+  for (uint16_t y = 0; y < height; y++) {
+    for (uint16_t x = 0; x < width; x += 8) {  // SSD1680 processes 8 pixels per byte
+      const uint32_t byte_pos = (x + y * width) / 8u;
+
+      // Check Black/White buffer (first half of our buffer)
+      if (this->buffer_[byte_pos] != this->old_buffer_[byte_pos]) {
+        found_change = true;
+        if (x < x_start) x_start = x;
+        if (x + 7 > x_end) x_end = x + 7;
+        if (y < y_start) y_start = y;
+        if (y > y_end) y_end = y;
+      }
+
+      // Check Red buffer (second half of our buffer)
+      if (this->buffer_[byte_pos + buf_half_len] != this->old_buffer_[byte_pos + buf_half_len]) {
+        found_change = true;
+        if (x < x_start) x_start = x;
+        if (x + 7 > x_end) x_end = x + 7;
+        if (y < y_start) y_start = y;
+        if (y > y_end) y_end = y;
+      }
+    }
+  }
+
+  if (!found_change) {
+    // No changes detected, set minimal update area
+    x_start = 0;
+    y_start = 0;
+    x_end = 7;
+    y_end = 0;
+  } else {
+    // Expand dirty region slightly to prevent edge artifacts
+    // This accounts for potential aliasing effects in e-paper displays
+    if (x_start >= 8) x_start -= 8;
+    else x_start = 0;
+
+    if (y_start >= 8) y_start -= 8;
+    else y_start = 0;
+
+    x_end = std::min((uint16_t)(x_end + 8), (uint16_t)(width - 1));
+    y_end = std::min((uint16_t)(y_end + 8), (uint16_t)(height - 1));
+
+    // Align to byte boundaries (required by SSD1680 addressing)
+    // This matches the GxEPD2 approach for reliable partial updates
+    x_start = (x_start / 8) * 8;
+    x_end = ((x_end / 8) + 1) * 8 - 1;
+    if (x_end >= width) x_end = width - 1;
+  }
+}
+
+void EPaper2P9InBWR::copy_buffer_() {
+  // Save current buffer state for next change detection cycle
+  if (this->old_buffer_ != nullptr) {
+    const uint32_t buffer_size = this->get_buffer_length_();
+    memcpy(this->old_buffer_, this->buffer_, buffer_size);
+  }
+}
+
+void EPaper2P9InBWR::update_full_() {
+  const uint32_t buf_len = this->get_buffer_length_();
+  const uint32_t buf_half_len = buf_len / 2u;
+
+  // Set full screen update area
+  this->set_memory_area_(0, 0, this->get_width_internal(), this->get_height_internal());
+
+  // ===== COMMAND 0x24: Write RAM (Black/White) =====
+  // Spec: Writes data to the Black/White RAM area
+  // Each bit controls one pixel: 0=black, 1=white
+  // Data is written sequentially starting from the address counter position
+  this->set_memory_pointer_(0, 0);
+  this->command(0x24);
+  for (uint32_t i = 0; i < buf_half_len; i++) {
+    this->data(this->buffer_[i]);
+  }
+
+  // ===== COMMAND 0x26: Write RAM (Red) =====
+  // Spec: Writes data to the Red color RAM area
+  // Each bit controls red pixel overlay: 0=no red, 1=red
+  // Red pixels override the BW data at the same coordinates
+  this->set_memory_pointer_(0, 0);
+  this->command(0x26);
+  for (uint32_t i = buf_half_len; i < buf_len; i++) {
+    this->data(~this->buffer_[i]);  // Invert red data
+  }
+
+  // ===== COMMAND 0x22: Display Update Control 2 =====
+  this->command(0x22);
+  this->data(0xF7);
+
+  // ===== COMMAND 0x20: Master Activation =====
+  // Triggers the actual display update sequence using settings from 0x22
+  // This starts the waveform application and refreshes the display
+  this->command(0x20);
+  this->wait_until_idle_();  // Wait for display refresh completion
+
+  this->copy_buffer_();
+  this->first_update_ = false;
+}
+
+void EPaper2P9InBWR::update_partial_() {
+  uint16_t x_start, y_start, x_end, y_end;
+  this->find_dirty_region_(x_start, y_start, x_end, y_end);
+
+  // Evaluate if partial update is worthwhile
+  // Large dirty regions benefit more from full refresh
+  const uint16_t dirty_width = x_end - x_start + 1;
+  const uint16_t dirty_height = y_end - y_start + 1;
+  const uint32_t dirty_pixels = dirty_width * dirty_height;
+  const uint32_t total_pixels = this->get_width_internal() * this->get_height_internal();
+
+  if (dirty_pixels > total_pixels / 4) {  // >25% of screen changed
+    ESP_LOGD(TAG, "Dirty region too large (%" PRIu32 "/%" PRIu32 " pixels), using full update", dirty_pixels, total_pixels);
+    this->update_full_();
+    return;
+  }
+
+  ESP_LOGD(TAG, "Partial update region: %d,%d to %d,%d (%dx%d)", x_start, y_start, x_end, y_end, dirty_width, dirty_height);
+
+  const uint32_t buf_half_len = this->get_buffer_length_() / 2u;
+  const uint16_t width = this->get_width_internal();
+
+  // Set partial update window - this is what makes it "partial"
+  this->set_memory_area_(x_start, y_start, dirty_width, dirty_height);
+
+  // Write Black/White data for dirty region only
+  this->set_memory_pointer_(x_start, y_start);
+  this->command(0x24);  // Write RAM (BW)
+
+  for (uint16_t y = y_start; y <= y_end; y++) {
+    for (uint16_t x = x_start; x <= x_end; x += 8) {  // 8 pixels per byte
+      const uint32_t byte_pos = (x + y * width) / 8u;
+      this->data(this->buffer_[byte_pos]);
+    }
+  }
+
+  // Write Red data for dirty region only
+  this->set_memory_pointer_(x_start, y_start);
+  this->command(0x26);  // Write RAM (Red)
+
+  for (uint16_t y = y_start; y <= y_end; y++) {
+    for (uint16_t x = x_start; x <= x_end; x += 8) {  // 8 pixels per byte
+      const uint32_t byte_pos = (x + y * width) / 8u;
+      this->data(~this->buffer_[byte_pos + buf_half_len]);  // Invert red data
+    }
+  }
+
+  // ===== SAME UPDATE SEQUENCE AS FULL UPDATE =====
+  // The controller automatically optimizes based on the defined window
+  this->command(0x22);
+  this->data(0xF7);
+
+  this->command(0x20);
+  this->wait_until_idle_();
+
+  this->copy_buffer_();
+}
+
+void EPaper2P9InBWR::display() {
+  if (!this->has_significant_changes_()) {
+    ESP_LOGD(TAG, "No significant changes detected, skipping update");
+    return;
+  }
+
+  this->init_display_();
+  this->at_update_++;
+  // Periodic full updates are essential for e-paper quality
+  // They prevent ghosting artifacts that accumulate from partial updates
+  if (this->full_update_every_ != 0 && this->at_update_ % this->full_update_every_ == 0) {
+    ESP_LOGD(TAG, "Scheduled full update (%" PRIu32 "/%" PRIu32 ")", this->at_update_, this->full_update_every_);
+    this->update_full_();
+  } else {
+    ESP_LOGD(TAG, "Performing partial update");
+    this->update_partial_();
+  }
+
+  this->deep_sleep();
+}
+
+void EPaper2P9InBWR::dump_config() {
+  LOG_DISPLAY("", "2.9\" BWR E-Paper", this);
+  ESP_LOGCONFIG(TAG, "  Model: 2.9in BWR (SSD1680 Controller)");
+  ESP_LOGCONFIG(TAG, "  Resolution: %dx%d", this->get_width_internal(), this->get_height_internal());
+  ESP_LOGCONFIG(TAG, "  Full Update Every: %" PRIu32, this->full_update_every_);
+  LOG_PIN("  Reset Pin: ", this->reset_pin_);
+  LOG_PIN("  DC Pin: ", this->dc_pin_);
+  LOG_PIN("  Busy Pin: ", this->busy_pin_);
+  LOG_UPDATE_INTERVAL(this);
+}
+
+void EPaper2P9InBWR::set_full_update_every(uint32_t full_update_every) {
+  this->full_update_every_ = full_update_every;
+}
+
+void EPaper2P9InBWR::deep_sleep() {
+  // ===== COMMAND 0x10: Deep Sleep Mode =====
+  // Spec: Puts SSD1680 into ultra-low power mode (~1μA current)
+  // Data 0x01: Enter deep sleep mode
+
+  ESP_LOGD(TAG, "Entering deep sleep mode...");
+
+  if (this->reset_pin_ != nullptr) {  // Only if reset pin available for wake-up
+    this->command(0x10);
+    this->data(0x01);  // Enter deep sleep mode
+    this->wait_until_idle_();
+  }
+}
+
 }  // namespace waveshare_epaper
 }  // namespace esphome

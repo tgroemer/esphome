@@ -1099,5 +1099,35 @@ class WaveshareEPaper13P3InK : public WaveshareEPaper {
   uint32_t idle_timeout_() override;
 };
 
+class EPaper2P9InBWR : public WaveshareEPaperBWR {
+ public:
+  void initialize() override;
+  void display() override;
+  void dump_config() override;
+  void deep_sleep() override;
+  void set_full_update_every(uint32_t full_update_every);
+
+ protected:
+  int get_width_internal() override { return 128; }
+  int get_height_internal() override { return 296; }
+  uint32_t idle_timeout_() override { return 15000; }
+
+  void reset_() override;
+  void init_display_();
+  void update_full_();
+  void update_partial_();
+  void set_memory_area_(uint16_t x_start, uint16_t y_start, uint16_t x_end, uint16_t y_end);
+  void set_memory_pointer_(uint16_t x, uint16_t y);
+  bool has_significant_changes_();
+  void find_dirty_region_(uint16_t &x_start, uint16_t &y_start, uint16_t &x_end, uint16_t &y_end);
+  void copy_buffer_();
+
+ private:
+  uint32_t full_update_every_{30};
+  uint32_t at_update_{0};
+  uint8_t *old_buffer_{nullptr};
+  bool first_update_{true};
+};
+
 }  // namespace waveshare_epaper
 }  // namespace esphome
