@@ -4992,6 +4992,7 @@ void EPaper2P9InBWR::update_full_() {
   this->set_memory_pointer_(0, 0);
   this->command(0x24);
   for (uint32_t i = 0; i < buf_half_len; i++) {
+    ESP_LOGD(TAG, "Updating byte bw %d", i);
     this->data(this->buffer_[i]);
   }
 
@@ -5002,6 +5003,7 @@ void EPaper2P9InBWR::update_full_() {
   this->set_memory_pointer_(0, 0);
   this->command(0x26);
   for (uint32_t i = buf_half_len; i < buf_len; i++) {
+    ESP_LOGD(TAG, "Updating byte red %d", i);
     this->data(~this->buffer_[i]);  // Invert red data
   }
 
