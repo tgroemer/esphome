@@ -4996,10 +4996,10 @@ void EPaper2P9InBWR::update_full_() {
     ESP_LOGD(TAG, "Updating bw byte %u %u", i, this->buffer_[i]);
     this->data(this->buffer_[i]);
 
-    //if (i % 100 == 0) {
-    //  App.feed_wdt();
-    //  delay(5);
-    //}
+    if (i % 100 == 0) {
+      App.feed_wdt();
+      delay(5);
+    }
   }
 
   ESP_LOGD(TAG, "Updated bw bytes");
@@ -5015,10 +5015,10 @@ void EPaper2P9InBWR::update_full_() {
     ESP_LOGD(TAG, "Updating r byte %u %u", i, this->buffer_[i]);
     this->data(this->buffer_[i]);
 
-    //if (i % 100 == 0) {
-    //  App.feed_wdt();
-    //  delay(5);
-    //}
+    if (i % 100 == 0) {
+      App.feed_wdt();
+      delay(5);
+    }
   }
 
   ESP_LOGD(TAG, "Updated r bytes");
