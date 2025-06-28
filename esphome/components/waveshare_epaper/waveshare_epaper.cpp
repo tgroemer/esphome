@@ -5145,7 +5145,8 @@ void EPaper2P9InBWR::deep_sleep() {
   if (this->reset_pin_ != nullptr) {  // Only if reset pin available for wake-up
     this->command(0x10);
     this->data(0x01);  // Enter deep sleep mode
-    this->wait_until_idle_();
+
+    //this->wait_until_idle_();
   }
 }
 
