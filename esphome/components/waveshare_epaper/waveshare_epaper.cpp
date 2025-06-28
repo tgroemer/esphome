@@ -4753,18 +4753,14 @@ void WaveshareEPaper13P3InK::dump_config() {
 void EPaper2P9InBWR::initialize() {
   ESP_LOGD(TAG, "Initializing EPaper 2.9\" BWR display...");
 
-  // Allocate & clear old_buffer_ (half = BW, half = Red)
-  const uint32_t buf_len = this->get_buffer_length_();
-  const uint32_t half_len = buf_len / 2;
   if (this->old_buffer_) {
     delete[] this->old_buffer_;
     this->old_buffer_ = nullptr;
   }
+
   this->old_buffer_ = new uint8_t[buf_len];
-  // BW plane = white (0xFF), Red plane = no-red (0x00)
-  //memset(this->old_buffer_,       0xFF,    half_len);
-  //memset(this->old_buffer_ + half_len, 0x00, half_len);
-  memset(this->old_buffer_, 0xFF, buf_len);  // Initialize to white (0xFF)
+  memset(this->old_buffer_, 0x00, buf_len);
+
   this->init_display_();
 }
 
@@ -4880,12 +4876,7 @@ void EPaper2P9InBWR::set_memory_pointer_(uint16_t x, uint16_t y) {
   this->data(y / 256);      // Y address high byte
 }
 
-bool EPaper2P9InBWR::has_significant_changes_() {
-  if (this->first_update_ || this->old_buffer_ == nullptr) {
-    ESP_LOGD(TAG, "Detected changes: first update");
-    return true;  // Always update on first run or if no previous buffer
-  }
-
+int EPaper2P9InBWR::compute_diff_() {
   const uint32_t buffer_size = this->get_buffer_length_();
   uint32_t changes = 0;
 
@@ -4894,15 +4885,11 @@ bool EPaper2P9InBWR::has_significant_changes_() {
   for (uint32_t i = 0; i < buffer_size; i++) {
     if (this->buffer_[i] != this->old_buffer_[i]) {
       changes++;
-      // TODO
-      // if (changes > buffer_size / 10) {  // >10% changed = prefer full update
-      //   return true;
-      // }
     }
   }
 
   ESP_LOGD(TAG, "Detected changes: %d out of %d bytes", changes, buffer_size);
-  return changes > 0;
+  return changes;
 }
 
 void EPaper2P9InBWR::find_dirty_region_(uint16_t &x_start, uint16_t &y_start, uint16_t &x_end, uint16_t &y_end) {
@@ -4987,13 +4974,12 @@ void EPaper2P9InBWR::update_full_() {
 
   // ===== COMMAND 0x24: Write RAM (Black/White) =====
   // Spec: Writes data to the Black/White RAM area
-  // Each bit controls one pixel: 0=black, 1=white
   // Data is written sequentially starting from the address counter position
   this->set_memory_pointer_(0, 0);
   this->command(0x24);
 
   for (uint32_t i = 0; i < buf_half_len; i++) {
-    ESP_LOGD(TAG, "Updating bw byte %u %u", i, this->buffer_[i]);
+    ESP_LOGD(TAG, "Updating bw byte %u %u", i, std::bitset<8>(this->buffer_[i]));
     this->data(this->buffer_[i]);
 
     if (i % 100 == 0) {
@@ -5012,7 +4998,7 @@ void EPaper2P9InBWR::update_full_() {
   this->command(0x26);
 
   for (uint32_t i = buf_half_len; i < buf_len; i++) {
-    ESP_LOGD(TAG, "Updating r byte %u %u", i, this->buffer_[i]);
+    ESP_LOGD(TAG, "Updating r byte %u %u", i, std::bitset<8>(this->buffer_[i]));
     this->data(this->buffer_[i]);
 
     if (i % 100 == 0) {
@@ -5100,10 +5086,7 @@ void EPaper2P9InBWR::update_partial_() {
 }
 
 void EPaper2P9InBWR::display() {
-  //if (!this->has_significant_changes_()) {
-  //  ESP_LOGD(TAG, "No significant changes detected, skipping update");
-  //  return;
-  //}
+  this->compute_diff_();
 
   this->init_display_();
   this->at_update_++;
