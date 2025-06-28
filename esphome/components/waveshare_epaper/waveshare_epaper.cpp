@@ -4942,14 +4942,14 @@ void EPaper2P9InBWR::find_dirty_region_(uint16_t &x_start, uint16_t &y_start, ui
   } else {
     // Expand dirty region slightly to prevent edge artifacts
     // This accounts for potential aliasing effects in e-paper displays
-    if (x_start >= 8) x_start -= 8;
-    else x_start = 0;
+    //if (x_start >= 8) x_start -= 8;
+    //else x_start = 0;
 
-    if (y_start >= 8) y_start -= 8;
-    else y_start = 0;
+    //if (y_start >= 8) y_start -= 8;
+    //else y_start = 0;
 
-    x_end = std::min((uint16_t)(x_end + 8), (uint16_t)(width - 1));
-    y_end = std::min((uint16_t)(y_end + 8), (uint16_t)(height - 1));
+    //x_end = std::min((uint16_t)(x_end + 8), (uint16_t)(width - 1));
+    //y_end = std::min((uint16_t)(y_end + 8), (uint16_t)(height - 1));
 
     // Align to byte boundaries (required by SSD1680 addressing)
     // This matches the GxEPD2 approach for reliable partial updates
@@ -5062,6 +5062,7 @@ void EPaper2P9InBWR::update_partial_() {
   }
 
   // Write Red data for dirty region only
+  //this->set_memory_area_(x_start, y_start, dirty_width, dirty_height);
   //this->set_memory_pointer_(x_start, y_start);
   //this->command(0x26);  // Write RAM (Red)
 
