@@ -5084,7 +5084,7 @@ void EPaper2P9InBWR::update_partial_() {
   for (uint16_t y = y_start; y <= y_end; y++) {
     for (uint16_t x = x_start; x <= x_end; x += 8) {  // 8 pixels per byte
       const uint32_t byte_pos = (x + y * width) / 8u;
-      this->data(~this->buffer_[byte_pos + buf_half_len]);  // Invert red data
+      this->data(this->buffer_[byte_pos + buf_half_len]);
     }
   }
 
