@@ -4764,7 +4764,7 @@ void EPaper2P9InBWR::initialize() {
   // BW plane = white (0xFF), Red plane = no-red (0x00)
   //memset(this->old_buffer_,       0xFF,    half_len);
   //memset(this->old_buffer_ + half_len, 0x00, half_len);
-  memset(this->old_buffer_, 0x00, buf_len);  // Initialize to white (0xFF)
+  memset(this->old_buffer_, 0xFF, buf_len);  // Initialize to white (0xFF)
   this->init_display_();
 }
 
