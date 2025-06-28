@@ -4995,15 +4995,13 @@ void EPaper2P9InBWR::update_full_() {
   for (uint32_t i = 0; i < buf_half_len; i++) {
     this->data(this->buffer_[i]);
 
-    if (i % 100 == 0) {
-      App.feed_wdt();
-      delay(5);
-    }
+    //if (i % 100 == 0) {
+    //  App.feed_wdt();
+    //  delay(5);
+    //}
   }
 
   ESP_LOGD(TAG, "Updated bw bytes");
-
-  delay(100);
 
   // ===== COMMAND 0x26: Write RAM (Red) =====
   // Spec: Writes data to the Red color RAM area
@@ -5015,10 +5013,10 @@ void EPaper2P9InBWR::update_full_() {
   for (uint32_t i = buf_half_len; i < buf_len; i++) {
     this->data(this->buffer_[i]);
 
-    if (i % 100 == 0) {
-      App.feed_wdt();
-      delay(5);
-    }
+    //if (i % 100 == 0) {
+    //  App.feed_wdt();
+    //  delay(5);
+    //}
   }
 
   ESP_LOGD(TAG, "Updated r bytes");
@@ -5094,22 +5092,22 @@ void EPaper2P9InBWR::update_partial_() {
   this->data(0xF7);
 
   this->command(0x20);
-  this->wait_until_idle_();
+  //this->wait_until_idle_();
 
   this->copy_buffer_();
 }
 
 void EPaper2P9InBWR::display() {
-  if (!this->has_significant_changes_()) {
-    ESP_LOGD(TAG, "No significant changes detected, skipping update");
-    return;
-  }
+  //if (!this->has_significant_changes_()) {
+  //  ESP_LOGD(TAG, "No significant changes detected, skipping update");
+  //  return;
+  //}
 
   this->init_display_();
   this->at_update_++;
   // Periodic full updates are essential for e-paper quality
   // They prevent ghosting artifacts that accumulate from partial updates
-  if (this->full_update_every_ != 0 && this->at_update_ % this->full_update_every_ == 0) {
+  if (this->first_update_ || this->full_update_every_ != 0 && this->at_update_ % this->full_update_every_ == 0) {
     ESP_LOGD(TAG, "Scheduled full update (%" PRIu32 "/%" PRIu32 ")", this->at_update_, this->full_update_every_);
     this->update_full_();
   } else {
