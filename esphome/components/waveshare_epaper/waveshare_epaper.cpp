@@ -5034,7 +5034,7 @@ void EPaper2P9InBWR::update_full_() {
   // This starts the waveform application and refreshes the display
   this->command(0x20);
   ESP_LOGD(TAG, "2");
-  this->wait_until_idle_();  // Wait for display refresh completion
+  //this->wait_until_idle_();  // Wait for display refresh completion
   ESP_LOGD(TAG, "3");
   this->copy_buffer_();
   ESP_LOGD(TAG, "4");
