@@ -4981,7 +4981,7 @@ void EPaper2P9InBWR::update_full_() {
   this->command(0x24);
 
   for (uint32_t i = 0; i < buf_half_len; i++) {
-    ESP_LOGD(TAG, "Updating bw byte %u %u", i, std::bitset<8>(this->buffer_[i]));
+    ESP_LOGD(TAG, "Updating bw byte %u %s", i, std::bitset<8>(this->buffer_[i]).to_string().c_str());
     this->data(this->buffer_[i]);
 
     if (i % 100 == 0) {
@@ -5000,7 +5000,7 @@ void EPaper2P9InBWR::update_full_() {
   this->command(0x26);
 
   for (uint32_t i = buf_half_len; i < buf_len; i++) {
-    ESP_LOGD(TAG, "Updating r byte %u %u", i, std::bitset<8>(this->buffer_[i]));
+    ESP_LOGD(TAG, "Updating r byte %u %s", i, std::bitset<8>(this->buffer_[i]).to_string().c_str());
     this->data(this->buffer_[i]);
 
     if (i % 100 == 0) {
