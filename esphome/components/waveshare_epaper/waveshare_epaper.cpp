@@ -4753,6 +4753,8 @@ void WaveshareEPaper13P3InK::dump_config() {
 void EPaper2P9InBWR::initialize() {
   ESP_LOGD(TAG, "Initializing EPaper 2.9\" BWR display...");
 
+  const uint32_t buf_len = this->get_buffer_length_();
+
   if (this->old_buffer_) {
     delete[] this->old_buffer_;
     this->old_buffer_ = nullptr;
