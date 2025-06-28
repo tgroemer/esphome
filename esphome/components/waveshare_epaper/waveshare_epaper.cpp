@@ -4934,10 +4934,10 @@ void EPaper2P9InBWR::find_dirty_region_(uint16_t &x_start, uint16_t &y_start, ui
   }
 
   if (!found_change) {
-    // No changes detected, set update area to zero
+    // No changes detected, set minimal update area
     x_start = 0;
     y_start = 0;
-    x_end = 0;
+    x_end = 7;
     y_end = 0;
   } else {
     // Expand dirty region slightly to prevent edge artifacts
@@ -5016,17 +5016,12 @@ void EPaper2P9InBWR::update_full_() {
   this->command(0x22);
   this->data(0xF7);
 
-  ESP_LOGD(TAG, "1");
-
   // ===== COMMAND 0x20: Master Activation =====
   // Triggers the actual display update sequence using settings from 0x22
   // This starts the waveform application and refreshes the display
   this->command(0x20);
-  ESP_LOGD(TAG, "2");
-  //this->wait_until_idle_();  // Wait for display refresh completion
-  ESP_LOGD(TAG, "3");
+
   this->copy_buffer_();
-  ESP_LOGD(TAG, "4");
   this->first_update_ = false;
 }
 
@@ -5040,11 +5035,6 @@ void EPaper2P9InBWR::update_partial_() {
   const uint16_t dirty_height = y_end - y_start + 1;
   const uint32_t dirty_pixels = dirty_width * dirty_height;
   const uint32_t total_pixels = this->get_width_internal() * this->get_height_internal();
-
-  if (dirty_pixels == 0) {
-    ESP_LOGD(TAG, "No dirty region found, skipping update");
-    return;
-  }
 
   if (dirty_pixels > total_pixels / 4) {  // >25% of screen changed
     ESP_LOGD(TAG, "Dirty region too large (%" PRIu32 "/%" PRIu32 " pixels), using full update", dirty_pixels, total_pixels);
@@ -5094,7 +5084,10 @@ void EPaper2P9InBWR::update_partial_() {
 }
 
 void EPaper2P9InBWR::display() {
-  this->compute_diff_();
+  if (this->compute_diff_() == 0 && !this->first_update_) {
+    ESP_LOGD(TAG, "No dirty region found, skipping update");
+    return;
+  }
 
   this->init_display_();
   this->at_update_++;
@@ -5136,8 +5129,6 @@ void EPaper2P9InBWR::deep_sleep() {
   if (this->reset_pin_ != nullptr) {  // Only if reset pin available for wake-up
     this->command(0x10);
     this->data(0x01);  // Enter deep sleep mode
-
-    //this->wait_until_idle_();
   }
 }
 
