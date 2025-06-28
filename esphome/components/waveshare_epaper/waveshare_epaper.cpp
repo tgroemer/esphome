@@ -5027,13 +5027,17 @@ void EPaper2P9InBWR::update_full_() {
   this->command(0x22);
   this->data(0xF7);
 
+  ESP_LOGD(TAG, "1");
+
   // ===== COMMAND 0x20: Master Activation =====
   // Triggers the actual display update sequence using settings from 0x22
   // This starts the waveform application and refreshes the display
   this->command(0x20);
+  ESP_LOGD(TAG, "2");
   this->wait_until_idle_();  // Wait for display refresh completion
-
+  ESP_LOGD(TAG, "3");
   this->copy_buffer_();
+  ESP_LOGD(TAG, "4");
   this->first_update_ = false;
 }
 
