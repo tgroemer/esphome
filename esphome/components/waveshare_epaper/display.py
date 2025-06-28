@@ -178,7 +178,7 @@ MODELS = {
     "13.3in-k": ("b", WaveshareEPaper13P3InK),
 }
 
-RESET_PIN_REQUIRED_MODELS = ("2.13inv2", "2.13in-ttgo-b74")
+RESET_PIN_REQUIRED_MODELS = ("2.13inv2", "2.13in-ttgo-b74", "2.9in-bwr")
 
 
 def validate_full_update_every_only_types_ac(value):

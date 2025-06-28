@@ -4761,7 +4761,7 @@ void EPaper2P9InBWR::initialize() {
   }
 
   this->old_buffer_ = new uint8_t[buf_len];
-  memset(this->old_buffer_, 0x00, buf_len);
+  memset(this->old_buffer_, 0xFF, buf_len);
 
   this->init_display_();
 }
@@ -4934,10 +4934,10 @@ void EPaper2P9InBWR::find_dirty_region_(uint16_t &x_start, uint16_t &y_start, ui
   }
 
   if (!found_change) {
-    // No changes detected, set minimal update area
+    // No changes detected, set update area to zero
     x_start = 0;
     y_start = 0;
-    x_end = 7;
+    x_end = 0;
     y_end = 0;
   } else {
     // Expand dirty region slightly to prevent edge artifacts
@@ -4976,6 +4976,7 @@ void EPaper2P9InBWR::update_full_() {
 
   // ===== COMMAND 0x24: Write RAM (Black/White) =====
   // Spec: Writes data to the Black/White RAM area
+  // 0 black, 1 white
   // Data is written sequentially starting from the address counter position
   this->set_memory_pointer_(0, 0);
   this->command(0x24);
@@ -5039,6 +5040,11 @@ void EPaper2P9InBWR::update_partial_() {
   const uint16_t dirty_height = y_end - y_start + 1;
   const uint32_t dirty_pixels = dirty_width * dirty_height;
   const uint32_t total_pixels = this->get_width_internal() * this->get_height_internal();
+
+  if (dirty_pixels == 0) {
+    ESP_LOGD(TAG, "No dirty region found, skipping update");
+    return;
+  }
 
   if (dirty_pixels > total_pixels / 4) {  // >25% of screen changed
     ESP_LOGD(TAG, "Dirty region too large (%" PRIu32 "/%" PRIu32 " pixels), using full update", dirty_pixels, total_pixels);
