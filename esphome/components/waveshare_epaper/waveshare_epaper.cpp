@@ -5052,7 +5052,7 @@ void EPaper2P9InBWR::update_partial_() {
     return;
   }
 
-  ESP_LOGD(TAG, "Partial update region: %d,%d to %d,%d (%dx%d)", x_start, y_start, x_end, y_end, dirty_width, dirty_height);
+  ESP_LOGD(TAG, "Partial update region: %d,%d to %d,%d (%dx%d). Updating %u pixels.", x_start, y_start, x_end, y_end, dirty_width, dirty_height, dirty_pixels);
 
   const uint32_t buf_half_len = this->get_buffer_length_() / 2u;
   const uint16_t width = this->get_width_internal();
