@@ -1118,7 +1118,7 @@ class EPaper2P9InBWR : public WaveshareEPaperBWR {
   void update_partial_();
   void set_memory_area_(uint16_t x_start, uint16_t y_start, uint16_t x_end, uint16_t y_end);
   void set_memory_pointer_(uint16_t x, uint16_t y);
-  bool has_significant_changes_();
+  uint32_t compute_changes_();
   void find_dirty_region_(uint16_t &x_start, uint16_t &y_start, uint16_t &x_end, uint16_t &y_end);
   void copy_buffer_();
 

@@ -4876,7 +4876,7 @@ void EPaper2P9InBWR::set_memory_pointer_(uint16_t x, uint16_t y) {
   this->data(y / 256);      // Y address high byte
 }
 
-int EPaper2P9InBWR::compute_diff_() {
+uint32_t EPaper2P9InBWR::compute_diff_() {
   const uint32_t buffer_size = this->get_buffer_length_();
   uint32_t changes = 0;
 
