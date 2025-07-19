@@ -5071,10 +5071,9 @@ void EPaper2P9InBWR::update_partial_() {
   }
 
   this->command(0x22);  // Display Update Control 2
-  this->data(0xCC);
+  this->data(0x1C);
 
   this->command(0x20);  // Master Activation - trigger update
-  //this->wait_until_idle_();
 
   this->copy_buffer_();
 }
