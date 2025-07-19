@@ -5074,7 +5074,7 @@ void EPaper2P9InBWR::update_partial_() {
   this->data(0x0F);
 
   this->command(0x20);  // Master Activation - trigger update
-  this->wait_until_idle_();
+  //this->wait_until_idle_();
 
   this->copy_buffer_();
 }
