@@ -4981,13 +4981,8 @@ void EPaper2P9InBWR::update_full_() {
   this->command(0x24);
 
   for (uint32_t i = 0; i < buf_half_len; i++) {
-    ESP_LOGD(TAG, "Updating bw byte %u %s", i % buf_half_len, std::bitset<8>(this->buffer_[i]).to_string().c_str());
+    //ESP_LOGD(TAG, "Updating bw byte %u %s", i % buf_half_len, std::bitset<8>(this->buffer_[i]).to_string().c_str());
     this->data(this->buffer_[i]);
-
-    if (i % 100 == 0) {
-      App.feed_wdt();
-      delay(5);
-    }
   }
 
   ESP_LOGD(TAG, "Updated bw bytes");
@@ -5000,13 +4995,8 @@ void EPaper2P9InBWR::update_full_() {
   this->command(0x26);
 
   for (uint32_t i = buf_half_len; i < buf_len; i++) {
-    ESP_LOGD(TAG, "Updating r byte %u %s", i % buf_half_len, std::bitset<8>(this->buffer_[i]).to_string().c_str());
+    //ESP_LOGD(TAG, "Updating r byte %u %s", i % buf_half_len, std::bitset<8>(this->buffer_[i]).to_string().c_str());
     this->data(this->buffer_[i]);
-
-    if (i % 100 == 0) {
-      App.feed_wdt();
-      delay(5);
-    }
   }
 
   ESP_LOGD(TAG, "Updated r bytes");
@@ -5025,29 +5015,35 @@ void EPaper2P9InBWR::update_full_() {
 }
 
 void EPaper2P9InBWR::update_partial_() {
+  // ===== Step 1: Load LUT first for BWR partial update =====
   this->write_lut_(PARTIAL_UPD_2IN9_LUT, PARTIAL_UPD_2IN9_LUT_SIZE);
 
+  // ===== Step 2: Command 0x37 - Write Register for Display Option =====
+  // Set proper display mode for BWR partial refresh
   this->command(0x37);
-  this->data(0x00);
-  this->data(0x00);
-  this->data(0x00);
-  this->data(0x00);
-  this->data(0x00);
-  this->data(0x40);
-  this->data(0x00);
-  this->data(0x00);
-  this->data(0x00);
-  this->data(0x00);
+  this->data(0x00);  // A[7:0] - VCOM OTP selection (default)
+  this->data(0x00);  // B[7:0] - Display Mode for WS[7:0] - Mode 1 for all
+  this->data(0x00);  // C[7:0] - Display Mode for WS[15:8]
+  this->data(0x00);  // D[7:0] - Display Mode for WS[23:16]
+  this->data(0x00);  // E[7:0] - Display Mode for WS[31:24]
+  this->data(0x00);  // F[7:0] - Display Mode for WS[35:32] + PingPong disabled
+  this->data(0x00);  // G[7:0] - Waveform version
+  this->data(0x00);  // H[7:0] - Waveform version
+  this->data(0x00);  // I[7:0] - Waveform version
+  this->data(0x00);  // J[7:0] - Waveform version
 
+  // ===== Step 3: Command 0x3C - Border Waveform Control =====
   this->command(0x3C);
-  this->data(0x80);
+  this->data(0x80);  // Border follows LUT for partial update
 
-  this->command(0x22);
-  this->data(0xC0);
-  this->command(0x20);
+  // ===== Step 4: Initial preparation sequence =====
+  this->command(0x22);  // Display Update Control 2
+  this->data(0xC0);     // Enable clock + Enable Analog (preparation)
+  this->command(0x20);  // Master Activation
 
   if (!this->wait_until_idle_()) {
-    ESP_LOGE(TAG, "fail idle 2");
+    ESP_LOGE(TAG, "Failed to wait for idle state during BWR partial update prep");
+    return;
   }
 
   uint16_t x_start, y_start, x_end, y_end;
@@ -5070,35 +5066,36 @@ void EPaper2P9InBWR::update_partial_() {
   const uint32_t buf_half_len = this->get_buffer_length_() / 2u;
   const uint16_t width = this->get_width_internal();
 
-  // Set partial update window
+  // ===== Step 5: Set partial update window =====
   this->set_memory_area_(x_start, y_start, dirty_width, dirty_height);
 
-  // Write Black/White data for dirty region only
+  // ===== Step 6: Write Black/White data (RAM 0x24) =====
   this->set_memory_pointer_(x_start, y_start);
-  this->command(0x24);  // Write RAM (BW)
+  this->command(0x24);  // Write RAM (Black White)
 
   for (uint16_t y = y_start; y <= y_end; y++) {
-    for (uint16_t x = x_start; x <= x_end; x += 8) {  // 8 pixels per byte
+    for (uint16_t x = x_start; x <= x_end; x += 8) {
       const uint32_t byte_pos = (x + y * width) / 8u;
       this->data(this->buffer_[byte_pos]);
     }
   }
 
-  // Write Red data for dirty region only
+  // ===== Step 7: Write Red data (RAM 0x26) =====
   this->set_memory_pointer_(x_start, y_start);
-  this->command(0x26);  // Write RAM (Red)
+  this->command(0x26);  // Write RAM (RED)
 
   for (uint16_t y = y_start; y <= y_end; y++) {
-    for (uint16_t x = x_start; x <= x_end; x += 8) {  // 8 pixels per byte
+    for (uint16_t x = x_start; x <= x_end; x += 8) {
       const uint32_t byte_pos = (x + y * width) / 8u;
       this->data(this->buffer_[byte_pos + buf_half_len]);
     }
   }
 
   this->command(0x22);  // Display Update Control 2
-  this->data(0x0F);
+  this->data(0xCF);
 
-  this->command(0x20);  // Master Activation - trigger update
+  // ===== Step 9: Trigger update
+  this->command(0x20);  // Master Activation
 
   this->copy_buffer_();
 }
