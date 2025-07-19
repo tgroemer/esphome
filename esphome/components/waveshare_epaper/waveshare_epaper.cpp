@@ -5070,9 +5070,8 @@ void EPaper2P9InBWR::update_partial_() {
     }
   }
 
-  // Configure for partial refresh - KEY FIX: Use 0x44 instead of 0xCF
   this->command(0x22);  // Display Update Control 2
-  this->data(0x44);     // Correct partial update mode value for SSD1680
+  this->data(0x0F);
 
   this->command(0x20);  // Master Activation - trigger update
   this->wait_until_idle_();
