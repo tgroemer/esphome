@@ -5076,7 +5076,7 @@ void EPaper2P9InBWR::update_partial_() {
   // ===== SAME UPDATE SEQUENCE AS FULL UPDATE =====
   // The controller automatically optimizes based on the defined window
   this->command(0x22);
-  this->data(0xF7);
+  this->data(0xC7);
 
   this->command(0x20);
   //this->wait_until_idle_();
