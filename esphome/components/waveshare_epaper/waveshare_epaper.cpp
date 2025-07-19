@@ -5070,12 +5070,9 @@ void EPaper2P9InBWR::update_partial_() {
     }
   }
 
-  // Reset memory window to full screen before update
-  this->set_memory_area_(0, 0, this->get_width_internal(), this->get_height_internal());
-
-  // Configure for partial refresh
+  // Configure for partial refresh - KEY FIX: Use 0x44 instead of 0xCF
   this->command(0x22);  // Display Update Control 2
-  this->data(0xCF);     // Partial update mode for BWR displays
+  this->data(0x44);     // Correct partial update mode value for SSD1680
 
   this->command(0x20);  // Master Activation - trigger update
   this->wait_until_idle_();
@@ -5089,7 +5086,11 @@ void EPaper2P9InBWR::display() {
     return;
   }
 
-  this->init_display_();
+  // Only reinitialize on first update to avoid disrupting partial refresh capability
+  if (this->first_update_) {
+    this->init_display_();
+  }
+
   this->at_update_++;
   // Periodic full updates are essential for e-paper quality
   // They prevent ghosting artifacts that accumulate from partial updates
