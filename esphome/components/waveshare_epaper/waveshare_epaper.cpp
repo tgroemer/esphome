@@ -4952,7 +4952,6 @@ void EPaper2P9InBWR::find_dirty_region_(uint16_t &x_start, uint16_t &y_start, ui
     //y_end = std::min((uint16_t)(y_end + 8), (uint16_t)(height - 1));
 
     // Align to byte boundaries (required by SSD1680 addressing)
-    // This matches the GxEPD2 approach for reliable partial updates
     x_start = (x_start / 8) * 8;
     x_end = ((x_end / 8) + 1) * 8 - 1;
     if (x_end >= width) x_end = width - 1;
@@ -5030,7 +5029,6 @@ void EPaper2P9InBWR::update_partial_() {
   this->find_dirty_region_(x_start, y_start, x_end, y_end);
 
   // Evaluate if partial update is worthwhile
-  // Large dirty regions benefit more from full refresh
   const uint16_t dirty_width = x_end - x_start + 1;
   const uint16_t dirty_height = y_end - y_start + 1;
   const uint32_t dirty_pixels = dirty_width * dirty_height;
@@ -5047,7 +5045,7 @@ void EPaper2P9InBWR::update_partial_() {
   const uint32_t buf_half_len = this->get_buffer_length_() / 2u;
   const uint16_t width = this->get_width_internal();
 
-  // Set partial update window - this is what makes it "partial"
+  // Set partial update window
   this->set_memory_area_(x_start, y_start, dirty_width, dirty_height);
 
   // Write Black/White data for dirty region only
@@ -5062,39 +5060,27 @@ void EPaper2P9InBWR::update_partial_() {
   }
 
   // Write Red data for dirty region only
-  //this->set_memory_area_(x_start, y_start, dirty_width, dirty_height);
-  //this->set_memory_pointer_(x_start, y_start);
-  //this->command(0x26);  // Write RAM (Red)
+  this->set_memory_pointer_(x_start, y_start);
+  this->command(0x26);  // Write RAM (Red)
 
-  //for (uint16_t y = y_start; y <= y_end; y++) {
-  //  for (uint16_t x = x_start; x <= x_end; x += 8) {  // 8 pixels per byte
-  //    const uint32_t byte_pos = (x + y * width) / 8u;
-  //    this->data(this->buffer_[byte_pos + buf_half_len]);
-  //  }
-  //}
+  for (uint16_t y = y_start; y <= y_end; y++) {
+    for (uint16_t x = x_start; x <= x_end; x += 8) {  // 8 pixels per byte
+      const uint32_t byte_pos = (x + y * width) / 8u;
+      this->data(this->buffer_[byte_pos + buf_half_len]);
+    }
+  }
 
-  // ===== SAME UPDATE SEQUENCE AS FULL UPDATE =====
-  // The controller automatically optimizes based on the defined window
-  //this->command(0x22);
-  //this->data(0xF7);
+  // Reset memory window to full screen before update
+  this->set_memory_area_(0, 0, this->get_width_internal(), this->get_height_internal());
 
-  this->command(0x37);
-  this->data(0x00);
-  this->data(0x00);
-  this->data(0x00);
-  this->data(0x00);
-  this->data(0x40);
-  this->data(0x00);
-  this->data(0x00);
+  // Configure for partial refresh
+  this->command(0x22);  // Display Update Control 2
+  this->data(0xCF);     // Partial update mode for BWR displays
 
-  this->command(0x22);
-  this->data(0xc0);
-
-  this->command(0x20);
+  this->command(0x20);  // Master Activation - trigger update
   this->wait_until_idle_();
 
   this->copy_buffer_();
-}
 
 void EPaper2P9InBWR::display() {
   if (this->compute_diff_() == 0 && !this->first_update_) {
