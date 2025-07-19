@@ -1121,6 +1121,7 @@ class EPaper2P9InBWR : public WaveshareEPaperBWR {
   uint32_t compute_diff_();
   void find_dirty_region_(uint16_t &x_start, uint16_t &y_start, uint16_t &x_end, uint16_t &y_end);
   void copy_buffer_();
+  void write_lut_(const uint8_t *lut, uint8_t size);
 
  private:
   uint32_t full_update_every_{30};

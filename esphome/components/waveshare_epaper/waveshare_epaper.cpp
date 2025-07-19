@@ -5025,6 +5025,31 @@ void EPaper2P9InBWR::update_full_() {
 }
 
 void EPaper2P9InBWR::update_partial_() {
+  this->write_lut_(PARTIAL_UPD_2IN9_LUT, PARTIAL_UPD_2IN9_LUT_SIZE);
+
+  this->command(0x37);
+  this->data(0x00);
+  this->data(0x00);
+  this->data(0x00);
+  this->data(0x00);
+  this->data(0x00);
+  this->data(0x40);
+  this->data(0x00);
+  this->data(0x00);
+  this->data(0x00);
+  this->data(0x00);
+
+  this->command(0x3C);
+  this->data(0x80);
+
+  this->command(0x22);
+  this->data(0xC0);
+  this->command(0x20);
+
+  if (!this->wait_until_idle_()) {
+    ESP_LOGE(TAG, "fail idle 2");
+  }
+
   uint16_t x_start, y_start, x_end, y_end;
   this->find_dirty_region_(x_start, y_start, x_end, y_end);
 
@@ -5116,6 +5141,13 @@ void EPaper2P9InBWR::dump_config() {
 
 void EPaper2P9InBWR::set_full_update_every(uint32_t full_update_every) {
   this->full_update_every_ = full_update_every;
+}
+
+void EPaper2P9InBWR::write_lut_(const uint8_t *lut, const uint8_t size) {
+  // COMMAND WRITE LUT REGISTER
+  this->command(0x32);
+  for (uint8_t i = 0; i < size; i++)
+  this->data(lut[i]);
 }
 
 void EPaper2P9InBWR::deep_sleep() {
