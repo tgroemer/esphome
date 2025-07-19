@@ -5081,6 +5081,7 @@ void EPaper2P9InBWR::update_partial_() {
   this->wait_until_idle_();
 
   this->copy_buffer_();
+}
 
 void EPaper2P9InBWR::display() {
   if (this->compute_diff_() == 0 && !this->first_update_) {
